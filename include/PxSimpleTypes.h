@@ -33,8 +33,6 @@
 
 */
 
-#include <assert.h>
-
 namespace physx
 {
 	typedef signed __int64		PxI64;
@@ -54,6 +52,5 @@ namespace physx
 };
 
 #define PX_INLINE inline
-#define PX_ASSERT assert
 
 #endif

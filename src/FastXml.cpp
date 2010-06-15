@@ -1,3 +1,5 @@
+#include "PsShare.h"
+#include "PxAssert.h"
 #include "FastXml.h"
 #include "PxFileBuf.h"
 #include <stdio.h>
@@ -160,7 +162,7 @@ public:
 
 				if ( *data == 0 ) data = 0;
 
-				if ( !iface->processElement(element, argc/2, argv, data, mLineNo) )
+				if ( !iface->processElement(element, argc, argv, data, mLineNo) )
 				{
 					mError = "User aborted the parsing process";
 					return 0;
