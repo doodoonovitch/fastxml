@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "PxAssert.h"
 
 /*!
 **
@@ -83,7 +84,7 @@ public:
 		mDepth++;
 		indent();
 		printf("Element: %s with %d attributes.\r\n", elementName, argc );
-		for (physx::PxI32 i=0; i<argc; i++)
+		for (physx::PxI32 i=0; i<(argc/2); i++)
 		{
 			indent();
 			printf("Attribute[%d] %s=%s\r\n", i+1, argv[i*2], argv[i*2+1] );
