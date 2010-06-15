@@ -1,8 +1,8 @@
 #include "FastXml.h"
 #include "PxFileBuf.h"
-#include "PsUserAllocated.h"
+#include <stdio.h>
 #include <string.h>
-#include <malloc.h>
+#include <new>
 
 /*!
 **
@@ -38,7 +38,7 @@
 namespace FAST_XML
 {
 
-class MyFastXml : public FastXml, public physx::UserAllocated
+class MyFastXml : public FastXml
 {
 public:
 	enum CharType
@@ -50,8 +50,9 @@ public:
 		CT_END_OF_LINE,
 	};
 
-	MyFastXml()
+	MyFastXml(Callback *c)
 	{
+		mCallback = c;
 		memset(mTypes, CT_DATA, sizeof(mTypes));
 		mTypes[0] = CT_EOF;
 		mTypes[' '] = mTypes['\t'] = CT_SOFT;
@@ -60,8 +61,16 @@ public:
 		mError = 0;
 		mStackIndex = 0;
 		mFileBuf = NULL;
+		mReadBufferEnd = NULL;
 		mReadBuffer = NULL;
-		mReadBufferSize = 1024*1024; // process data one megabyte at a time by default...
+		mReadBufferSize = 16*1024; // by default read in 16k chunks
+		mOpenCount = 0;
+		mLastReadLoc = 0;
+		for (physx::PxU32 i=0; i<(MAX_STACK+1); i++)
+		{
+			mStack[i] = NULL;
+			mStackAllocated[i] = false;
+		}
 	}
 
 	virtual ~MyFastXml(void)
@@ -93,10 +102,9 @@ public:
 				pushElement(element);
 
 				const char *close = popElement();
-				if( !iface->processClose(close) )
+				if( !iface->processClose(close,mStackIndex) )
 				{
-					mError = "User aborted the parsing process";
-					return 0;
+					return NULL;
 				}
 			}
 
@@ -137,6 +145,8 @@ public:
 
 			if ( *scan == '<' )
 			{
+				PX_ASSERT(mOpenCount>0);
+				mOpenCount--;
 				if ( dest_data )
 				{
 					*dest_data = 0;
@@ -191,6 +201,11 @@ public:
 			}
 		}
 
+		if ( mOpenCount < 2 )
+		{
+			scan = readData(scan);
+		}
+
 		return scan;
 	}
 
@@ -211,38 +226,103 @@ public:
 			return 0;
 		}
 
-		if( !iface->processClose(close) )
+		if( !iface->processClose(close,mStackIndex) )
 		{
-			mError = "User aborted the parsing process";
-			return 0;
+			// we need to set the read pointer!
+			physx::PxU32 offset = (physx::PxU32)(mReadBufferEnd-scan)-1;
+			physx::PxU32 readLoc = mLastReadLoc-offset;
+			mFileBuf->seekRead(readLoc); 
+			return NULL;
 		}
+		++scan;
 
-		return ++scan;
+		return scan;
 	}
 
-	virtual bool processXml(physx::PxFileBuf &fileBuf, FastXml::Callback *iface)
+	virtual bool processXml(physx::PxFileBuf &fileBuf)
 	{
 		releaseMemory();
 		mFileBuf = &fileBuf;
-		return processXml(iface);
+		return processXml(mCallback);
 	}
 
 	// if we have finished processing the data we had pending..
-	char * readData(void)
+	char * readData(char *scan)
 	{
-		char *ret = NULL;
+		for (physx::PxU32 i=0; i<(mStackIndex+1); i++)
+		{
+			if ( !mStackAllocated[i] )
+			{
+				const char *text = mStack[i];
+				if ( text )
+				{
+					physx::PxU32 tlen = (physx::PxU32)strlen(text);
+					mStack[i] = (const char *)mCallback->fastxml_malloc(tlen+1);
+					memcpy((void *)mStack[i],text,tlen+1);
+					mStackAllocated[i] = true;
+				}
+			}
+		}
 
 		if ( mReadBuffer == NULL )
 		{
-			mReadBuffer = (char *)::malloc(mReadBufferSize+1);
+			mReadBuffer = (char *)mCallback->fastxml_malloc(mReadBufferSize+1);
 		}
-		physx::PxU32 readCount = mFileBuf->read(mReadBuffer,mReadBufferSize);
-		if ( readCount > 0 )
+		physx::PxU32 offset = 0;
+		physx::PxU32 readLen = mReadBufferSize;
+
+		if ( scan )
 		{
-			ret = mReadBuffer;
-			mReadBuffer[readCount] = 0; // end of string terminator...
+			offset = (physx::PxU32)(scan - mReadBuffer );
+			physx::PxU32 copyLen = mReadBufferSize-offset;
+			if ( copyLen )
+			{
+				memcpy(mReadBuffer,scan,copyLen);
+				readLen = mReadBufferSize - copyLen;
+			}
+			offset = copyLen;
 		}
-		return ret;
+
+		physx::PxU32 readCount = mFileBuf->read(&mReadBuffer[offset],readLen);
+
+		while ( readCount > 0 )
+		{
+
+			mReadBuffer[readCount+offset] = 0; // end of string terminator...
+			mReadBufferEnd = &mReadBuffer[readCount+offset];
+
+			const char *scan = &mReadBuffer[offset];
+			while ( *scan )
+			{
+				if ( *scan == '<' )
+				{
+					mOpenCount++;
+				}
+				scan++;
+			}
+
+			if ( mOpenCount < 2 )
+			{
+				physx::PxU32 oldSize = (physx::PxU32)(mReadBufferEnd-mReadBuffer);
+				mReadBufferSize = mReadBufferSize*2;
+				char *oldReadBuffer = mReadBuffer;
+				mReadBuffer = (char *)mCallback->fastxml_malloc(mReadBufferSize+1);
+				memcpy(mReadBuffer,oldReadBuffer,oldSize);
+				mCallback->fastxml_free(oldReadBuffer);
+				offset = oldSize;
+				physx::PxU32 readSize = mReadBufferSize - oldSize;
+				readCount = mFileBuf->read(&mReadBuffer[offset],readSize);
+				if ( readCount == 0 )
+					break;
+			}
+			else
+			{
+				break;
+			}
+		}
+		mLastReadLoc = mFileBuf->tellRead();
+
+		return mReadBuffer;
 	}
 
 	bool processXml(FastXml::Callback *iface)
@@ -253,7 +333,7 @@ public:
 
 		mLineNo = 1;
 
-		char *element, *scan = readData();
+		char *element, *scan = readData(0);
 
 		while( *scan )
 		{
@@ -261,6 +341,8 @@ public:
 			if( *scan == 0 ) break;
 			if( *scan == '<' )
 			{
+				PX_ASSERT(mOpenCount>0);
+				mOpenCount--;
 				scan++;
 				if( *scan == '?' ) //Allow xml declarations
 				{
@@ -290,7 +372,9 @@ public:
 			{
 				scan = processClose(scan, iface);
 				if( !scan )
-					return false;
+				{
+					return true;
+				}
 			}
 			else
 			{
@@ -311,7 +395,9 @@ public:
 					*scan++ = 0;
 					scan = processClose(c, element, scan, argc, argv, iface);
 					if ( !scan )
-						return false;
+					{
+						return true;
+					}
 				}
 				else
 				{
@@ -334,8 +420,10 @@ public:
 								scan++;
 							}
 							scan = processClose(c, element, scan, argc, argv, iface);
-							if ( !scan ) 
-								return false;
+							if ( !scan )
+							{
+								return true;
+							}
 							break;
 						}
 						else
@@ -419,16 +507,33 @@ public:
 
 	virtual void release(void)
 	{
-		delete this;
+		Callback *c = mCallback;	// get the user allocator interface
+		MyFastXml *f = this;		// cast the this pointer
+		f->~MyFastXml();			// explicitely invoke the destructor for this class
+		c->fastxml_free(f);			// now free up the memory associated with it.
 	}
 
 private:
 	PX_INLINE void releaseMemory(void)
 	{
-		mError = 0;
 		mFileBuf = NULL;
-		::free(mReadBuffer);
+		mCallback->fastxml_free(mReadBuffer);
 		mReadBuffer = NULL;
+		mLastReadLoc = 0;
+		mStackIndex = 0;
+		mReadBufferEnd = NULL;
+		mOpenCount = 0;
+		mLastReadLoc = 0;
+		mError = NULL;
+		for (physx::PxU32 i=0; i<(mStackIndex+1); i++)
+		{
+			if ( mStackAllocated[i] )
+			{
+				mCallback->fastxml_free((void *)mStack[i]);
+				mStackAllocated[i] = false;
+			}
+			mStack[i] = NULL;
+		}
 	}
 
 	PX_INLINE char *nextSoft(char *scan)
@@ -465,12 +570,25 @@ private:
 	{
 		PX_ASSERT( mStackIndex < MAX_STACK );
 		if( mStackIndex < MAX_STACK )
+		{
+			if ( mStackAllocated[mStackIndex] )
+			{
+				mCallback->fastxml_free((void *)mStack[mStackIndex]);
+			}
+			mStackAllocated[mStackIndex] = false;
 			mStack[mStackIndex++] = element;
+		}
 	}
 
 	const char *popElement(void)
 	{
-		return mStackIndex ? mStack[--mStackIndex] : 0;
+		if ( mStackAllocated[mStackIndex] )
+		{
+			mCallback->fastxml_free((void*)mStack[mStackIndex]);
+			mStack[mStackIndex] = NULL;
+			mStackAllocated[mStackIndex] = false;
+		}
+		return mStackIndex ? mStack[--mStackIndex] : NULL;
 	}
 
 	static const int MAX_STACK = 2048;
@@ -478,18 +596,29 @@ private:
 	char mTypes[256];
 
 	physx::PxFileBuf *mFileBuf;
+
 	char			*mReadBuffer;
+	char			*mReadBufferEnd;
+
+	physx::PxU32	mOpenCount;
 	physx::PxU32	mReadBufferSize;
+	physx::PxU32	mLastReadLoc;
 
 	physx::PxI32 mLineNo;
 	const char *mError;
 	physx::PxU32 mStackIndex;
-	const char *mStack[MAX_STACK];
+	const char *mStack[MAX_STACK+1];
+	bool		mStackAllocated[MAX_STACK+1];
+	Callback	*mCallback;
 };
 
-FastXml * createFastXml(void)
+FastXml * createFastXml(FastXml::Callback *iface)
 {
-	MyFastXml *m = PX_NEW(MyFastXml);
+	MyFastXml *m = (MyFastXml *)iface->fastxml_malloc(sizeof(MyFastXml));
+	if ( m )
+	{
+		new ( m ) MyFastXml(iface);
+	}
 	return static_cast< FastXml *>(m);
 }
 
