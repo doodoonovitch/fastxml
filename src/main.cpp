@@ -44,11 +44,12 @@ public:
 	TestFastXML(physx::PxFileBuf &stream)
 	{
 		mDepth = 0;
-		FAST_XML::FastXml *xml = FAST_XML::createFastXml();
+		FAST_XML::FastXml *xml = FAST_XML::createFastXml(this);
 		PX_ASSERT(xml);
 		if ( xml )
 		{
-			xml->processXml(stream,this);
+			printf("Processing XML file once\r\n");
+			xml->processXml(stream);
 			xml->release();
 		}
 	}
@@ -59,13 +60,15 @@ public:
 		return true;
 	}
 
-	virtual bool processClose(const char *element) 
+	virtual bool processClose(const char *element,physx::PxU32 depth) 
 	{
+#if 1
 		indent();
 		printf("CLOSE TAG: %s\r\n", element );
 		mDepth--;
 		PX_ASSERT(mDepth>=0);
-		return true;
+#endif
+		return depth == 0 ? false : true;
 	}
 
 	// return true to continue processing the XML document, false to skip.
@@ -76,6 +79,7 @@ public:
 		const char  *elementData,  // element data, null if none
 		physx::PxI32 lineno)         // line number in the source XML file
 	{
+#if 1
 		mDepth++;
 		indent();
 		printf("Element: %s with %d attributes.\r\n", elementName, argc );
@@ -92,7 +96,7 @@ public:
 			scratch[95] = 0;
 			printf("ElementData: %s\r\n", scratch );
 		}
-
+#endif
 		return true;
 	}
 
@@ -110,8 +114,17 @@ public:
 		const char  *elementData,
 		physx::PxI32 lineno) 
 	{
-		PX_ASSERT(0);
 		return true;
+	}
+
+	virtual void *  fastxml_malloc(physx::PxU32 size) 
+	{
+		return ::malloc(size);
+	}
+
+	virtual void	fastxml_free(void *mem) 
+	{
+		::free(mem);
 	}
 
 	physx::PxI32	mDepth;

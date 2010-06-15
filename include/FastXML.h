@@ -50,7 +50,7 @@ public:
 	public:
 
 		virtual bool processComment(const char *comment) = 0; // encountered a comment in the XML
-		virtual bool processClose(const char *element) = 0;	  // process the 'close' indicator for a previously encountered element
+		virtual bool processClose(const char *element,physx::PxU32 depth) = 0;	  // process the 'close' indicator for a previously encountered element
 
 		// return true to continue processing the XML document, false to skip.
 		virtual bool processElement(
@@ -66,16 +66,20 @@ public:
 			const char **argv,
 			const char  *elementData,
 			physx::PxI32 lineno) = 0;
+
+		virtual void *  fastxml_malloc(physx::PxU32 size) = 0;
+		virtual void	fastxml_free(void *mem) = 0;
+
 	};
 
-	virtual bool processXml(physx::PxFileBuf &buff, Callback *iface) = 0;
+	virtual bool processXml(physx::PxFileBuf &buff) = 0;
 
 	virtual const char *getError(physx::PxI32 &lineno) = 0; // report the reason for a parsing error, and the line number where it occurred.
 
 	virtual void release(void) = 0;
 };
 
-FastXml * createFastXml(void);
+FastXml * createFastXml(FastXml::Callback *iface);
 
 }; // end of namespace FAST_XML
 
