@@ -1,0 +1,38 @@
+<data numObjects="1" version="1.0" >
+<struct name="ApexEmitterAssetParameters" version="0.0" checksum="0x47241ff 0x817b368b 0x7000597f 0xe33c70bc">
+  <struct name="densityRange">
+    <value name="min" type="F32">1</value>
+    <value name="max" type="F32">1</value>
+  </struct>
+  <struct name="rateRange">
+    <value name="min" type="F32">1000</value>
+    <value name="max" type="F32">1000</value>
+  </struct>
+  <struct name="lifetimeRange">
+    <value name="min" type="F32">2</value>
+    <value name="max" type="F32">5</value>
+  </struct>
+  <struct name="velocityRange">
+    <value name="min" type="Vec3">-3,0,-3</value>
+    <value name="max" type="Vec3">3,6,3</value>
+  </struct>
+  <value name="maxSamples" type="U32">100</value>
+  <struct name="lodParamDesc">
+    <value name="version" type="U32">0</value>
+    <value name="maxDistance" type="F32">100</value>
+    <value name="distanceWeight" type="F32">1</value>
+    <value name="speedWeight" type="F32">0</value>
+    <value name="lifeWeight" type="F32">0</value>
+    <value name="separationWeight" type="F32">0</value>
+    <value name="bias" type="F32">1</value>
+  </struct>
+  <value name="iofxAssetName" type="Ref" included="0" classTypeName="IOFX">testMeshIofx.xml</value>
+  <value name="iosAssetName" type="Ref" included="0" classTypeName="NxBasicIosAsset">testBasicIos.xml</value>
+  <value name="geometryType" type="Ref" included="1" classTypeName="EmitterGeomSphereParams" version="0.0" checksum="0x32c536f4 0xed7c2f5b 0x849cdcdd 0xfc376f11">  
+    <struct name="EmitterGeomSphereParams">
+      <value name="emitterType" type="Enum">rate</value>
+      <value name="radius" type="F32">2</value>
+    </struct>
+  </value>
+</struct>
+</data>
