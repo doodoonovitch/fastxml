@@ -1,0 +1,43 @@
+<data numObjects="1" version="1.0" >
+<struct name="IofxAssetParameters" version="0.0" checksum="0xe2e5167b 0xee48755f 0x67b82b09 0x2759973f">
+  <value name="maxObjectCount" type="U32">8192</value>
+  <array name="renderMeshList" size="2" type="Struct">
+    <struct>
+      <value name="meshAssetName" type="Ref" included="0" classTypeName="ApexRenderMesh">starbucksCup.arm</value>
+      <value name="weight" type="U32">100</value>
+    </struct>
+    <struct>
+      <value name="meshAssetName" type="Ref" included="0" classTypeName="ApexRenderMesh">leafMesh.arm</value>
+      <value name="weight" type="U32">1</value>
+    </struct>
+  </array>
+  <value name="spriteMaterialName" type="Ref" included="0" classTypeName="ApexMaterials"></value>
+  <array name="spawnModifierList" size="2" type="Ref">
+    <value type="Ref" included="1" classTypeName="SimpleScaleModifierParams" version="0.0" checksum="0x6baf3344 0x434f1230 0x6cc1ebe5 0x8760959f">    
+      <struct name="SimpleScaleModifierParams">
+        <value name="scaleFactor" type="Vec3">0.025,0.025,0.025</value>
+      </struct>
+    </value>
+    <value type="Ref" included="1" classTypeName="RotationModifierParams" version="0.0" checksum="0xb4bede6e 0xf14a2d06 0x865729e0 0x983d4599">    
+      <struct name="RotationModifierParams">
+        <value name="rollType" type="Enum">FLAT_Z</value>
+        <value name="maxRotationRatePerSec" type="F32">0</value>
+        <value name="maxSettleRatePerSec" type="F32">1</value>
+        <value name="inAirRotationMultiplier" type="F32">1</value>
+        <value name="collisionRotationMultiplier" type="F32">1</value>
+      </struct>
+    </value>
+  </array>
+  <array name="continuousModifierList" size="1" type="Ref">
+    <value type="Ref" included="1" classTypeName="RotationModifierParams" version="0.0" checksum="0xb4bede6e 0xf14a2d06 0x865729e0 0x983d4599">    
+      <struct name="RotationModifierParams">
+        <value name="rollType" type="Enum">FLAT_Z</value>
+        <value name="maxRotationRatePerSec" type="F32">6.28000021</value>
+        <value name="maxSettleRatePerSec" type="F32">3.140000105</value>
+        <value name="inAirRotationMultiplier" type="F32">1</value>
+        <value name="collisionRotationMultiplier" type="F32">1</value>
+      </struct>
+    </value>
+  </array>
+</struct>
+</data>

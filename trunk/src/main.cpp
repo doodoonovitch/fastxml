@@ -50,7 +50,7 @@ public:
 		if ( xml )
 		{
 			printf("Processing XML file once\r\n");
-			xml->processXml(stream);
+			xml->processXml(stream,true);
 			xml->release();
 		}
 	}
@@ -61,8 +61,9 @@ public:
 		return true;
 	}
 
-	virtual bool processClose(const char *element,physx::PxU32 depth) 
+	virtual bool processClose(const char *element,physx::PxU32 depth,bool &isError) 
 	{
+		isError = false;
 #if 1
 		indent();
 		printf("CLOSE TAG: %s\r\n", element );

@@ -1,0 +1,49 @@
+<data numObjects="1" version="1.0" >
+<struct name="IofxAssetParameters" version="0.0" checksum="0xe2e5167b 0xee48755f 0x67b82b09 0x2759973f">
+  <value name="maxObjectCount" type="U32">8192</value>
+  <array name="renderMeshList" size="0" type="Struct"></array>
+  <value name="spriteMaterialName" type="Ref" included="0" classTypeName="ApexMaterials">SampleRenderer/1/materials/particle_dust.xml</value>
+  <array name="spawnModifierList" size="1" type="Ref">
+    <value type="Ref" included="1" classTypeName="SimpleScaleModifierParams" version="0.0" checksum="0x6baf3344 0x434f1230 0x6cc1ebe5 0x8760959f">    
+      <struct name="SimpleScaleModifierParams">
+        <value name="scaleFactor" type="Vec3">1,1,1</value>
+      </struct>
+    </value>
+  </array>
+  <array name="continuousModifierList" size="5" type="Ref">
+    <value type="Ref" included="1" classTypeName="ColorVsLifeModifierParams" version="0.0" checksum="0xc6c4616c 0x19f6d1b7 0x80085144 0x8149a0ff">    
+      <struct name="ColorVsLifeModifierParams">
+        <value name="colorChannel" type="Enum">red</value>
+        <array name="controlPoints" size="2" type="Struct">
+          0 0,1 1        </array>
+      </struct>
+    </value>
+    <value type="Ref" included="1" classTypeName="ColorVsLifeModifierParams" version="0.0" checksum="0xc6c4616c 0x19f6d1b7 0x80085144 0x8149a0ff">    
+      <struct name="ColorVsLifeModifierParams">
+        <value name="colorChannel" type="Enum">green</value>
+        <array name="controlPoints" size="2" type="Struct">
+          0 1,1 1        </array>
+      </struct>
+    </value>
+    <value type="Ref" included="1" classTypeName="ColorVsLifeModifierParams" version="0.0" checksum="0xc6c4616c 0x19f6d1b7 0x80085144 0x8149a0ff">    
+      <struct name="ColorVsLifeModifierParams">
+        <value name="colorChannel" type="Enum">blue</value>
+        <array name="controlPoints" size="2" type="Struct">
+          0 1,1 0        </array>
+      </struct>
+    </value>
+    <value type="Ref" included="1" classTypeName="ColorVsLifeModifierParams" version="0.0" checksum="0xc6c4616c 0x19f6d1b7 0x80085144 0x8149a0ff">    
+      <struct name="ColorVsLifeModifierParams">
+        <value name="colorChannel" type="Enum">alpha</value>
+        <array name="controlPoints" size="3" type="Struct">
+          0 0,0.300000012 0.5,1 0.5        </array>
+      </struct>
+    </value>
+    <value type="Ref" included="1" classTypeName="ViewDirectionSortingModifierParams" version="0.0" checksum="0xdb9646c8 0x10fe90ad 0xe5dcb6cf 0xc6a91a5f">    
+      <struct name="ViewDirectionSortingModifierParams">
+        <value name="sortType" type="Enum">default</value>
+      </struct>
+    </value>
+  </array>
+</struct>
+</data>

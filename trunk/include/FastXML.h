@@ -50,7 +50,13 @@ public:
 	public:
 
 		virtual bool processComment(const char *comment) = 0; // encountered a comment in the XML
-		virtual bool processClose(const char *element,physx::PxU32 depth) = 0;	  // process the 'close' indicator for a previously encountered element
+
+		// 'element' is the name of the element that is being closed.
+		// depth is the recursion depth of this element.
+		// Return true to continue processing the XML file.
+		// Return false to stop processing the XML file; leaves the read pointer of the stream right after this close tag.
+		// The bool 'isError' indicates whether processing was stopped due to an error, or intentionally canceled early.
+		virtual bool processClose(const char *element,physx::PxU32 depth,bool &isError) = 0;	  // process the 'close' indicator for a previously encountered element
 
 		// return true to continue processing the XML document, false to skip.
 		virtual bool processElement(
@@ -72,7 +78,7 @@ public:
 
 	};
 
-	virtual bool processXml(physx::PxFileBuf &buff) = 0;
+	virtual bool processXml(physx::PxFileBuf &buff,bool streamFromMemory=false) = 0;
 
 	virtual const char *getError(physx::PxI32 &lineno) = 0; // report the reason for a parsing error, and the line number where it occurred.
 

@@ -1,0 +1,7 @@
+<data numObjects="1" version="1.0" >
+<struct name="NxApexBasicIOSAssetParam" version="0.0" checksum="0xc2c5e36c 0xeef1296c 0x3c8c6049 0x91f45e15">
+  <value name="restDensity" type="F32">1</value>
+  <value name="particleRadius" type="F32">0.100000001</value>
+  <value name="maxInjectedParticleCount" type="F32">0.100000001</value>
+</struct>
+</data>

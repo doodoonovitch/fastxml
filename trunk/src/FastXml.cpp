@@ -40,6 +40,9 @@
 namespace FAST_XML
 {
 
+#define MIN_CLOSE_COUNT 8
+#define DEFAULT_READ_BUFFER_SIZE (16*1024)
+
 class MyFastXml : public FastXml
 {
 public:
@@ -54,6 +57,7 @@ public:
 
 	MyFastXml(Callback *c)
 	{
+		mStreamFromMemory = false;
 		mCallback = c;
 		memset(mTypes, CT_DATA, sizeof(mTypes));
 		mTypes[0] = CT_EOF;
@@ -65,7 +69,7 @@ public:
 		mFileBuf = NULL;
 		mReadBufferEnd = NULL;
 		mReadBuffer = NULL;
-		mReadBufferSize = 16*1024; // by default read in 16k chunks
+		mReadBufferSize = DEFAULT_READ_BUFFER_SIZE;
 		mOpenCount = 0;
 		mLastReadLoc = 0;
 		for (physx::PxU32 i=0; i<(MAX_STACK+1); i++)
@@ -80,8 +84,9 @@ public:
 		releaseMemory();
 	}
 
-	char *processClose(char c, const char *element, char *scan, physx::PxI32 argc, const char **argv, FastXml::Callback *iface)
+	char *processClose(char c, const char *element, char *scan, physx::PxI32 argc, const char **argv, FastXml::Callback *iface,bool &isError)
 	{
+		isError = true; // by default, if we return null it's due to an error.
 		if ( c == '/' || c == '?' )
 		{
 			char *slash = (char *)strchr(element, c);
@@ -91,20 +96,20 @@ public:
 			if( c == '?' && strcmp(element, "xml") == 0 )
 			{
 				if( !iface->processXmlDeclaration(argc/2, argv, 0, mLineNo) )
-					return 0;
+					return NULL;
 			}
 			else
 			{
 				if ( !iface->processElement(element, argc, argv, 0, mLineNo) )
 				{
 					mError = "User aborted the parsing process";
-					return 0;
+					return NULL;
 				}
 
 				pushElement(element);
 
 				const char *close = popElement();
-				if( !iface->processClose(close,mStackIndex) )
+				if( !iface->processClose(close,mStackIndex,isError) )
 				{
 					return NULL;
 				}
@@ -192,18 +197,21 @@ public:
 				}
 				else if ( *scan == '/' )
 				{
-					scan = processClose(scan, iface);
-					if( !scan ) return 0;
+					scan = processClose(scan, iface, isError);
+					if( scan == NULL ) 
+					{
+						return NULL;
+					}
 				}
 			}
 			else
 			{
 				mError = "Data portion of an element wasn't terminated properly";
-				return 0;
+				return NULL;
 			}
 		}
 
-		if ( mOpenCount < 2 )
+		if ( mOpenCount < MIN_CLOSE_COUNT )
 		{
 			scan = readData(scan);
 		}
@@ -211,7 +219,7 @@ public:
 		return scan;
 	}
 
-	char *processClose(char *scan, FastXml::Callback *iface)
+	char *processClose(char *scan, FastXml::Callback *iface,bool &isError)
 	{
 		const char *start = popElement(), *close = start;
 		if( scan[1] != '>')
@@ -228,7 +236,7 @@ public:
 			return 0;
 		}
 
-		if( !iface->processClose(close,mStackIndex) )
+		if( !iface->processClose(close,mStackIndex,isError) )
 		{
 			// we need to set the read pointer!
 			physx::PxU32 offset = (physx::PxU32)(mReadBufferEnd-scan)-1;
@@ -241,10 +249,11 @@ public:
 		return scan;
 	}
 
-	virtual bool processXml(physx::PxFileBuf &fileBuf)
+	virtual bool processXml(physx::PxFileBuf &fileBuf,bool streamFromMemory)
 	{
 		releaseMemory();
 		mFileBuf = &fileBuf;
+		mStreamFromMemory = streamFromMemory;
 		return processXml(mCallback);
 	}
 
@@ -266,6 +275,12 @@ public:
 			}
 		}
 
+		if ( !mStreamFromMemory && scan == NULL )
+		{
+			physx::PxU32 seekLoc = mFileBuf->tellRead();
+			mReadBufferSize = (mFileBuf->getFileLength()-seekLoc);
+		}
+
 		if ( mReadBuffer == NULL )
 		{
 			mReadBuffer = (char *)mCallback->fastxml_malloc(mReadBufferSize+1);
@@ -279,7 +294,8 @@ public:
 			physx::PxU32 copyLen = mReadBufferSize-offset;
 			if ( copyLen )
 			{
-				memcpy(mReadBuffer,scan,copyLen);
+				PX_ASSERT(scan >= mReadBuffer);
+				memmove(mReadBuffer,scan,copyLen);
 				readLen = mReadBufferSize - copyLen;
 			}
 			offset = copyLen;
@@ -303,7 +319,7 @@ public:
 				scan++;
 			}
 
-			if ( mOpenCount < 2 )
+			if ( mOpenCount < MIN_CLOSE_COUNT )
 			{
 				physx::PxU32 oldSize = (physx::PxU32)(mReadBufferEnd-mReadBuffer);
 				mReadBufferSize = mReadBufferSize*2;
@@ -363,6 +379,7 @@ public:
 						if( !iface->processComment(comment) )
 						{
 							mError = "User aborted the parsing process";
+							PX_ALWAYS_ASSERT();
 							return false;
 						}
 					}
@@ -372,10 +389,16 @@ public:
 
 			if( *scan == '/' )
 			{
-				scan = processClose(scan, iface);
+				bool isError;
+				scan = processClose(scan, iface, isError);
 				if( !scan )
 				{
-					return true;
+					if ( isError )
+					{
+						PX_ALWAYS_ASSERT();
+						mError = "User aborted the parsing process";
+					}
+					return !isError;
 				}
 			}
 			else
@@ -395,15 +418,25 @@ public:
 						c = '>';
 					}
 					*scan++ = 0;
-					scan = processClose(c, element, scan, argc, argv, iface);
+					bool isError;
+					scan = processClose(c, element, scan, argc, argv, iface, isError);
 					if ( !scan )
 					{
-						return true;
+						if ( isError )
+						{
+							PX_ALWAYS_ASSERT();
+							mError = "User aborted the parsing process";
+						}
+						return !isError;
 					}
 				}
 				else
 				{
-					if ( *scan == 0 ) return ret;
+					if ( *scan == 0 ) 
+					{
+						return ret;
+					}
+
 					*scan = 0; // place a zero byte to indicate the end of the element name...
 					scan++;
 
@@ -417,14 +450,23 @@ public:
 							if( '?' == c )
 							{
 								if( '>' != *scan ) //?>
+								{
+									PX_ALWAYS_ASSERT();
 									return false;
+								}
 
 								scan++;
 							}
-							scan = processClose(c, element, scan, argc, argv, iface);
+							bool isError;
+							scan = processClose(c, element, scan, argc, argv, iface, isError);
 							if ( !scan )
 							{
-								return true;
+								if ( isError ) 
+								{
+									PX_ALWAYS_ASSERT();
+									mError = "User aborted the parsing process";
+								}
+								return !isError;
 							}
 							break;
 						}
@@ -432,6 +474,7 @@ public:
 						{
 							if( argc >= MAX_ATTRIBUTE )
 							{
+								PX_ALWAYS_ASSERT();
 								mError = "encountered too many attributes";
 								return false;
 							}
@@ -469,6 +512,7 @@ public:
 										}
 										else
 										{
+											PX_ALWAYS_ASSERT();
 											mError = "Failed to find closing quote for attribute";
 											return false;
 										}
@@ -492,6 +536,7 @@ public:
 
 		if( mStackIndex )
 		{
+			PX_ALWAYS_ASSERT();
 			mError = "Invalid file format";
 			return false;
 		}
@@ -610,6 +655,7 @@ private:
 	const char *mError;
 	physx::PxU32 mStackIndex;
 	const char *mStack[MAX_STACK+1];
+	bool		mStreamFromMemory;
 	bool		mStackAllocated[MAX_STACK+1];
 	Callback	*mCallback;
 };
