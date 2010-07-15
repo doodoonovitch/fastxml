@@ -40,8 +40,8 @@
 namespace FAST_XML
 {
 
-#define MIN_CLOSE_COUNT 8
-#define DEFAULT_READ_BUFFER_SIZE (16*1024)
+#define MIN_CLOSE_COUNT 2
+#define DEFAULT_READ_BUFFER_SIZE 4 //(16*1024)
 
 class MyFastXml : public FastXml
 {
@@ -57,7 +57,7 @@ public:
 
 	MyFastXml(Callback *c)
 	{
-		mStreamFromMemory = false;
+		mStreamFromMemory = true;
 		mCallback = c;
 		memset(mTypes, CT_DATA, sizeof(mTypes));
 		mTypes[0] = CT_EOF;
@@ -152,8 +152,11 @@ public:
 
 			if ( *scan == '<' )
 			{
-				PX_ASSERT(mOpenCount>0);
-				mOpenCount--;
+				if ( scan[1] != '/' )
+				{
+					PX_ASSERT(mOpenCount>0);
+					mOpenCount--;
+				}
 				if ( dest_data )
 				{
 					*dest_data = 0;
@@ -275,10 +278,17 @@ public:
 			}
 		}
 
-		if ( !mStreamFromMemory && scan == NULL )
+		if ( !mStreamFromMemory )
 		{
-			physx::PxU32 seekLoc = mFileBuf->tellRead();
-			mReadBufferSize = (mFileBuf->getFileLength()-seekLoc);
+			if ( scan == NULL )
+			{
+				physx::PxU32 seekLoc = mFileBuf->tellRead();
+				mReadBufferSize = (mFileBuf->getFileLength()-seekLoc);
+			}
+			else
+			{
+				return scan;
+			}
 		}
 
 		if ( mReadBuffer == NULL )
@@ -296,6 +306,7 @@ public:
 			{
 				PX_ASSERT(scan >= mReadBuffer);
 				memmove(mReadBuffer,scan,copyLen);
+				mReadBuffer[copyLen] = 0;
 				readLen = mReadBufferSize - copyLen;
 			}
 			offset = copyLen;
@@ -312,7 +323,7 @@ public:
 			const char *scan = &mReadBuffer[offset];
 			while ( *scan )
 			{
-				if ( *scan == '<' )
+				if ( *scan == '<' && scan[1] != '/' )
 				{
 					mOpenCount++;
 				}
@@ -355,13 +366,21 @@ public:
 
 		while( *scan )
 		{
+
 			scan = skipNextData(scan);
+
 			if( *scan == 0 ) break;
+
 			if( *scan == '<' )
 			{
-				PX_ASSERT(mOpenCount>0);
-				mOpenCount--;
+
+				if ( scan[1] != '/' )
+				{
+					PX_ASSERT(mOpenCount>0);
+					mOpenCount--;
+				}
 				scan++;
+
 				if( *scan == '?' ) //Allow xml declarations
 				{
 					scan++;
@@ -385,7 +404,50 @@ public:
 					}
 					continue;
 				}
+				else if ( scan[0] == '!' ) //Allow doctype
+				{
+					scan++;
+
+					//DOCTYPE syntax differs from usual XML so we parse it here
+
+					//Read DOCTYPE
+					const char *tag = "DOCTYPE";
+					if( !strstr(scan, tag) )
+					{
+						mError = "Invalid DOCTYPE";
+						PX_ALWAYS_ASSERT();
+						return false;
+					}
+
+					scan += strlen(tag);
+
+					//Skip whites
+					while(  CT_SOFT == mTypes[*scan] )
+						++scan;
+
+					//Read rootElement
+					const char *rootElement = scan;
+					while( CT_DATA == mTypes[*scan] )
+						++scan;
+
+					char *endRootElement = scan;
+
+					//TODO: read remaining fields (fpi, uri, etc.)
+					while( CT_END_OF_ELEMENT != mTypes[*scan++] );
+
+					*endRootElement = 0;
+
+					if( !iface->processDoctype(rootElement, 0, 0, 0) )
+					{
+						mError = "User aborted the parsing process";
+						PX_ALWAYS_ASSERT();
+						return false;
+					}
+
+					continue; //Restart loop
+				}
 			}
+
 
 			if( *scan == '/' )
 			{
@@ -432,7 +494,7 @@ public:
 				}
 				else
 				{
-					if ( *scan == 0 ) 
+					if ( *scan == 0 )
 					{
 						return ret;
 					}
@@ -461,7 +523,7 @@ public:
 							scan = processClose(c, element, scan, argc, argv, iface, isError);
 							if ( !scan )
 							{
-								if ( isError ) 
+								if ( isError )
 								{
 									PX_ALWAYS_ASSERT();
 									mError = "User aborted the parsing process";
@@ -561,6 +623,7 @@ public:
 	}
 
 private:
+
 	PX_INLINE void releaseMemory(void)
 	{
 		mFileBuf = NULL;
