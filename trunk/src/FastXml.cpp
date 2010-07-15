@@ -41,7 +41,7 @@ namespace FAST_XML
 {
 
 #define MIN_CLOSE_COUNT 2
-#define DEFAULT_READ_BUFFER_SIZE 4 //(16*1024)
+#define DEFAULT_READ_BUFFER_SIZE (16*1024)
 
 class MyFastXml : public FastXml
 {
